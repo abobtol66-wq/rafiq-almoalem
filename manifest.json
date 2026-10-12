@@ -1,0 +1,11 @@
+{
+  "name": "رفيق المعلم - مساحة المعلم الذكية",
+  "short_name": "رفيق المعلم",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f5f7fc",
+  "theme_color": "#172b4d",
+  "description": "إدارة الصفوف والدرجات والمسابقات والأنشطة والتكريم"
+}
