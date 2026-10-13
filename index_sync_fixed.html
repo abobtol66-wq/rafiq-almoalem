@@ -166,11 +166,13 @@ $('today').textContent=new Intl.DateTimeFormat('ar-AE',{weekday:'long',year:'num
  const $=id=>document.getElementById(id);
  const hash=new URLSearchParams(location.hash.replace(/^#/,''));
  const query=new URLSearchParams(location.search);
- const recovery=hash.get('type')==='recovery'||query.get('type')==='recovery'||!!hash.get('access_token')||!!query.get('code');
+ const authError=hash.get('error_description')||query.get('error_description')||hash.get('error_code')||query.get('error_code')||hash.get('error')||query.get('error');
+ const recovery=hash.get('type')==='recovery'||query.get('type')==='recovery'||!!hash.get('access_token')||!!query.get('code')||!!authError;
  if(!recovery)return;
  const overlay=$('recoveryOverlay'), msg=$('recoveryMessage'), save=$('recoverySaveButton');
  overlay.style.display='flex';
  const say=(t,ok=false)=>{msg.textContent=t;msg.style.color=ok?'#18734e':'#b13c50'};
+ if(authError){const expired=String(authError).toLowerCase().includes('otp_expired')||String(authError).toLowerCase().includes('expired');say(expired?'رابط الاستعادة منتهي الصلاحية أو استُخدم سابقًا. لم تتغير كلمة المرور. بعد انتهاء حد إرسال الرسائل، اطلب رابطًا واحدًا جديدًا وافتح أحدث رسالة على هذا المتصفح.':'تعذر اعتماد رابط الاستعادة: '+String(authError).replace(/\\+/g,' ')+'. لم تتغير كلمة المرور.');save.disabled=true;save.style.display='none';return;}
  let client=null;
  async function setup(){
   const cfg=JSON.parse(localStorage.getItem('rafiq_cloud_config_v1')||'{}');
