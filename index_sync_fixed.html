@@ -148,4 +148,57 @@ $('today').textContent=new Intl.DateTimeFormat('ar-AE',{weekday:'long',year:'num
   buttons();
 })();
 </script>
+
+<div id="recoveryOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:#172b4dcc;align-items:center;justify-content:center;padding:18px">
+ <div style="background:#fff;color:#253650;border-radius:18px;padding:24px;max-width:440px;width:100%;box-shadow:0 18px 60px #0003;direction:rtl;font-family:Tahoma,Arial,sans-serif">
+  <h2 style="margin:0 0 10px;color:#172b4d;font-size:21px">تعيين كلمة مرور جديدة</h2>
+  <p style="font-size:13px;line-height:1.9;color:#68788e">أدخل كلمة المرور الجديدة لحساب المزامنة. يجب أن تتكون من 8 أحرف على الأقل.</p>
+  <label for="recoveryNewPassword" style="display:block;font-size:13px;margin:12px 0 6px">كلمة المرور الجديدة</label>
+  <input id="recoveryNewPassword" type="password" autocomplete="new-password" minlength="8" style="width:100%;padding:12px;border:1px solid #dce3ee;border-radius:10px;box-sizing:border-box">
+  <label for="recoveryConfirmPassword" style="display:block;font-size:13px;margin:12px 0 6px">تأكيد كلمة المرور</label>
+  <input id="recoveryConfirmPassword" type="password" autocomplete="new-password" minlength="8" style="width:100%;padding:12px;border:1px solid #dce3ee;border-radius:10px;box-sizing:border-box">
+  <div id="recoveryMessage" style="font-size:12px;line-height:1.8;margin:12px 0;color:#b13c50"></div>
+  <button id="recoverySaveButton" style="width:100%;padding:12px;border:0;border-radius:10px;background:#13a89e;color:#fff;font-weight:bold;cursor:pointer">حفظ كلمة المرور الجديدة</button>
+ </div>
+</div>
+<script>
+(function(){
+ const $=id=>document.getElementById(id);
+ const hash=new URLSearchParams(location.hash.replace(/^#/,''));
+ const query=new URLSearchParams(location.search);
+ const recovery=hash.get('type')==='recovery'||query.get('type')==='recovery'||!!hash.get('access_token')||!!query.get('code');
+ if(!recovery)return;
+ const overlay=$('recoveryOverlay'), msg=$('recoveryMessage'), save=$('recoverySaveButton');
+ overlay.style.display='flex';
+ const say=(t,ok=false)=>{msg.textContent=t;msg.style.color=ok?'#18734e':'#b13c50'};
+ let client=null;
+ async function setup(){
+  const cfg=JSON.parse(localStorage.getItem('rafiq_cloud_config_v1')||'{}');
+  if(!cfg.url||!cfg.key)throw new Error('إعدادات الاتصال غير موجودة في هذا المتصفح. افتح صفحة رفيق المعلم واحفظ إعدادات الاتصال أولًا، ثم اطلب رابط استعادة جديدًا.');
+  if(!window.supabase||!window.supabase.createClient)throw new Error('مكتبة الاتصال لم تُحمّل. أعد تحميل الصفحة.');
+  client=window.supabase.createClient(cfg.url,cfg.key);
+  const code=query.get('code');
+  if(code){const {error}=await client.auth.exchangeCodeForSession(code);if(error)throw error}
+  if(hash.get('access_token')&&hash.get('refresh_token')){const {error}=await client.auth.setSession({access_token:hash.get('access_token'),refresh_token:hash.get('refresh_token')});if(error)throw error}
+  const {data,error}=await client.auth.getSession();if(error)throw error;
+  if(!data.session)throw new Error('رابط الاستعادة لا يحتوي على جلسة صالحة أو انتهت صلاحيته. اطلب رابطًا جديدًا وافتح أحدث رسالة فقط.');
+  say('الرابط صالح. أدخل كلمة المرور الجديدة ثم اضغط حفظ.',true);
+ }
+ setup().catch(e=>say(e.message||String(e)));
+ save.addEventListener('click',async()=>{
+  try{
+   if(!client)await setup();
+   const a=$('recoveryNewPassword').value,b=$('recoveryConfirmPassword').value;
+   if(a.length<8)throw new Error('كلمة المرور يجب أن تكون 8 أحرف على الأقل.');
+   if(a!==b)throw new Error('كلمتا المرور غير متطابقتين.');
+   save.disabled=true;save.textContent='جارٍ حفظ كلمة المرور…';
+   const {error}=await client.auth.updateUser({password:a});if(error)throw error;
+   say('تم تغيير كلمة المرور بنجاح. ارجع إلى صفحة المزامنة وسجّل الدخول بكلمة المرور الجديدة.',true);
+   history.replaceState(null,'',location.pathname+location.search);
+   $('recoveryNewPassword').value='';$('recoveryConfirmPassword').value='';
+   save.style.display='none';
+  }catch(e){say(e.message||String(e));save.disabled=false;save.textContent='حفظ كلمة المرور الجديدة'}
+ });
+})();
+</script>
 </body></html>
