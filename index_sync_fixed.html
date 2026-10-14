@@ -110,46 +110,7 @@ $('cloudResetPassword').onclick=async()=>{try{if(!cloudClient){const saved=readC
 $('today').textContent=new Intl.DateTimeFormat('ar-AE',{weekday:'long',year:'numeric',month:'long',day:'numeric'}).format(new Date());load();renderAll();if('serviceWorker' in navigator && location.protocol.startsWith('http'))window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 </script>
 <script>
-/* Cloud sync recovery layer: provides visible errors and retries Supabase CDN loading. */
-(function(){
-  let client=null, user=null, ready=false;
-  const $=id=>document.getElementById(id);
-  const status=(msg,type='')=>{const el=$('cloudStatus');if(el){el.textContent=msg;el.className='sync-status'+(type?' '+type:'')}};
-  const buttons=()=>{const logged=!!(client&&user);if($('cloudUpload'))$('cloudUpload').disabled=!logged;if($('cloudDownload'))$('cloudDownload').disabled=!logged;if($('cloudLogout'))$('cloudLogout').disabled=!logged};
-  function loadScript(src){return new Promise((resolve,reject)=>{const sc=document.createElement('script');sc.src=src;sc.onload=resolve;sc.onerror=()=>reject(new Error('تعذر تحميل مكتبة الاتصال'));document.head.appendChild(sc)})}
-  async function ensureLibrary(){
-    if(window.supabase&&typeof window.supabase.createClient==='function')return;
-    try{await loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2');}catch(e){}
-    if(window.supabase&&typeof window.supabase.createClient==='function')return;
-    try{await loadScript('https://unpkg.com/@supabase/supabase-js@2');}catch(e){}
-    if(!window.supabase||typeof window.supabase.createClient!=='function')throw new Error('تعذر تحميل مكتبة Supabase. قد تكون الشبكة تحجب مواقع المكتبات؛ جرّب شبكة أخرى ثم أعد المحاولة.');
-  }
-  async function connectFromFields(){
-    const url=$('cloudUrl').value.trim().replace(/\/$/,'');
-    const key=$('cloudKey').value.trim();
-    if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url)||!key)throw new Error('أدخل رابط Supabase الصحيح والمفتاح العام.');
-    localStorage.setItem('rafiq_cloud_config_v1',JSON.stringify({url,key}));
-    status('جارٍ تحميل مكتبة الاتصال والتحقق من الإعدادات…');
-    await ensureLibrary();
-    client=window.supabase.createClient(url,key);
-    const {data,error}=await client.auth.getSession();if(error)throw error;
-    user=data.session?.user||null;buttons();
-    status(user?'تم الاتصال بالحساب: '+user.email+' — اختر تنزيل بيانات السحابة أو رفع البيانات المحلية.':'تم حفظ إعدادات الاتصال بنجاح. سجّل الدخول أو أنشئ حسابًا للمتابعة.','ok');
-  }
-  async function restoreClient(){
-    if(client)return;
-    const cfg=JSON.parse(localStorage.getItem('rafiq_cloud_config_v1')||'{}');
-    if(!cfg.url||!cfg.key)throw new Error('احفظ إعدادات الاتصال أولًا.');
-    await ensureLibrary();client=window.supabase.createClient(cfg.url,cfg.key);
-  }
-  $('cloudSaveConfig').onclick=async()=>{try{await connectFromFields()}catch(e){status('تعذر حفظ/تهيئة الاتصال: '+(e.message||e),'err')}};
-  $('cloudSignup').onclick=async()=>{try{await restoreClient();const email=$('cloudEmail').value.trim(),password=$('cloudPassword').value;if(!email||password.length<8)throw new Error('أدخل بريدًا صحيحًا وكلمة مرور لا تقل عن 8 أحرف.');const {data,error}=await client.auth.signUp({email,password});if(error)throw error;user=data.session?.user||null;buttons();status(user?'تم إنشاء الحساب وتسجيل الدخول. اختر تنزيل السحابة أو رفع البيانات المحلية.':'تم إرسال رسالة تأكيد إذا كان تأكيد البريد مفعّلًا. أكّد بريدك ثم سجّل الدخول.','ok')}catch(e){status('تعذر إنشاء الحساب: '+(e.message||e),'err')}};
-  $('cloudLogin').onclick=async()=>{try{await restoreClient();const {data,error}=await client.auth.signInWithPassword({email:$('cloudEmail').value.trim(),password:$('cloudPassword').value});if(error)throw error;user=data.user;ready=false;buttons();status('تم تسجيل الدخول. اختر تنزيل بيانات السحابة أو رفع البيانات المحلية قبل متابعة التعديلات.','ok')}catch(e){status('تعذر تسجيل الدخول: '+(e.message||e),'err')}};
-  $('cloudLogout').onclick=async()=>{try{if(client)await client.auth.signOut();user=null;ready=false;buttons();status('تم تسجيل الخروج. بقيت النسخة المحلية محفوظة على هذا الجهاز.','ok')}catch(e){status('تعذر تسجيل الخروج: '+(e.message||e),'err')}};
-  $('cloudUpload').onclick=async()=>{try{await restoreClient();if(!user){const {data}=await client.auth.getSession();user=data.session?.user||null}if(!user)throw new Error('سجّل الدخول أولًا.');if(!confirm('سيتم رفع البيانات الموجودة على هذا الجهاز واستبدال النسخة السحابية لهذا الحساب. أنشئ نسخة JSON احتياطية قبل المتابعة. هل تريد المتابعة؟'))return;const payload=JSON.parse(localStorage.getItem('rafiq_app_v4')||'{}');const {error}=await client.from('rafiq_teacher_data').upsert({user_id:user.id,data:payload,updated_at:new Date().toISOString()},{onConflict:'user_id'});if(error)throw error;ready=true;status('تم رفع البيانات المحلية إلى السحابة بنجاح.','ok')}catch(e){status('فشل رفع البيانات: '+(e.message||e),'err')}};
-  $('cloudDownload').onclick=async()=>{try{await restoreClient();if(!user){const {data}=await client.auth.getSession();user=data.session?.user||null}if(!user)throw new Error('سجّل الدخول أولًا.');const {data,error}=await client.from('rafiq_teacher_data').select('data,updated_at').eq('user_id',user.id).maybeSingle();if(error)throw error;if(!data){status('لا توجد نسخة سحابية لهذا الحساب. استخدم «رفع البيانات المحلية» إذا كانت هذه بياناتك الأولى.','err');return}if(!Array.isArray(data.data?.classes)||!Array.isArray(data.data?.students))throw new Error('بيانات السحابة غير صالحة.');if(!confirm('سيتم استبدال بيانات هذا الجهاز بالنسخة السحابية المؤرخة '+new Date(data.updated_at).toLocaleString('ar-AE')+'. تأكد من تنزيل نسخة JSON احتياطية أولًا. هل تريد المتابعة؟'))return;localStorage.setItem('rafiq_app_v4',JSON.stringify(data.data));location.reload()}catch(e){status('فشل تنزيل البيانات: '+(e.message||e),'err')}};
-  buttons();
-})();
+/* Cloud sync event handlers are defined once in the main application script. Avoid creating a second Supabase client that can disagree with the diagnostic session. */
 </script>
 
 <div id="recoveryOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:#172b4dcc;align-items:center;justify-content:center;padding:18px">
