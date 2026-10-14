@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>فحص سحابة رفيق المعلم</title>
+<style>
+*{box-sizing:border-box}body{margin:0;padding:24px;min-height:100vh;display:grid;place-items:center;background:#f4f7fc;font-family:Tahoma,Arial,sans-serif;color:#1d3151}.card{width:min(100%,560px);background:white;border:1px solid #e0e7f2;border-radius:18px;padding:24px;box-shadow:0 10px 28px #172b4d12}h1{font-size:22px}p{line-height:1.9;color:#5c6d84;font-size:14px}button,a{display:block;width:100%;padding:13px;margin-top:12px;border:0;border-radius:10px;background:#0ca99e;color:white;text-align:center;text-decoration:none;font:inherit;font-weight:bold;cursor:pointer}button:disabled{opacity:.6}#result{margin-top:16px;padding:14px;border-radius:10px;background:#f4f6fa;line-height:1.9;white-space:pre-wrap;overflow-wrap:anywhere}.ok{background:#e4f7ee!important;color:#146b4a}.err{background:#fff0f1!important;color:#a72d40}.note{font-size:12px}
+</style>
+</head>
+<body><main class="card">
+<h1>فحص سحابة رفيق المعلم</h1>
+<p>هذه صفحة فحص مستقلة. تتحقق من إعدادات الاتصال وجلسة الدخول ووجود سجل لهذا الحساب. لا ترفع أو تحذف أو تستبدل أي بيانات.</p>
+<button id="run">بدء الفحص الآن</button>
+<div id="result">اضغط «بدء الفحص الآن» لعرض نتيجة واضحة.</div>
+<a href="https://abobtol66-wq.github.io/rafiq-almoalem/index_sync_fixed.html?v=20261014diagnostic">العودة إلى رفيق المعلم</a>
+<p class="note">لا تشارك المفتاح العام أو أي كلمة مرور. لن تعرض هذه الصفحة مفتاح الاتصال.</p>
+</main>
+<script>
+const result=document.getElementById('result'),btn=document.getElementById('run');
+function show(t,ok=false){result.textContent=t;result.className=ok?'ok':'err'}
+async function loadSdk(){
+ if(window.supabase?.createClient)return window.supabase;
+ for(const src of ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2','https://unpkg.com/@supabase/supabase-js@2']){
+  try{await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src;s.onload=resolve;s.onerror=()=>reject(new Error('فشل تحميل مصدر مكتبة الاتصال'));document.head.appendChild(s)});if(window.supabase?.createClient)return window.supabase}catch(e){}
+ }
+ throw new Error('تعذر تحميل مكتبة الاتصال من المصدرين. تحقق من الإنترنت ثم أعد المحاولة.');
+}
+btn.addEventListener('click',async()=>{
+ btn.disabled=true;btn.textContent='جارٍ الفحص…';show('1/3: فحص إعدادات الاتصال…',true);
+ try{
+  let cfg;try{cfg=JSON.parse(localStorage.getItem('rafiq_cloud_config_v1')||'{}')}catch(e){throw new Error('إعدادات الاتصال المحفوظة غير قابلة للقراءة.')}
+  if(!cfg.url||!cfg.key)throw new Error('لم أجد إعدادات الاتصال المحفوظة في هذا المتصفح. افتح رفيق المعلم، واحفظ إعدادات الاتصال، ثم ارجع لهذه الصفحة.');
+  const sdk=await loadSdk();
+  show('2/3: فحص جلسة الحساب…',true);
+  const client=sdk.createClient(cfg.url,cfg.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+  const {data:sessionData,error:sessionError}=await client.auth.getSession();
+  if(sessionError)throw new Error('تعذر قراءة جلسة الحساب: '+sessionError.message);
+  const user=sessionData.session?.user;
+  if(!user)throw new Error('لا توجد جلسة دخول محفوظة يمكن قراءتها هنا. ارجع إلى رفيق المعلم وسجّل الدخول، ثم افتح صفحة الفحص مجددًا.');
+  show('3/3: فحص سجل السحابة للحساب الحالي…',true);
+  const {data,error}=await client.from('rafiq_teacher_data').select('user_id,data,updated_at').eq('user_id',user.id).maybeSingle();
+  if(error)throw new Error('وصلنا إلى Supabase لكن فشل الاستعلام عن السجل: '+error.message+' (الرمز: '+(error.code||'غير متاح')+'). لم يتم تعديل البيانات.');
+  if(!data){show('اكتمل الاتصال وتأكدت جلسة الحساب، لكن لا يظهر سجل سحابي لهذا الحساب. لم يتم تغيير أي بيانات. الاحتمالات: السجل مربوط بمعرّف حساب آخر أو سياسة القراءة لا تسمح بعرضه.',false);return}
+  const d=data.data||{},count=k=>Array.isArray(d[k])?d[k].length:0;
+  show('نجح الفحص.\nتم العثور على سجل سحابي للحساب.\nآخر تحديث: '+(data.updated_at||'غير محدد')+'\nالصفوف: '+count('classes')+'\nالطلاب: '+count('students')+'\nالتقييمات: '+count('assessments')+'\nالدرجات: '+count('grades')+'\nلم يتم تغيير أي بيانات.',true);
+ }catch(e){show('لم يكتمل الفحص.\n'+(e.message||String(e))+'\nلم يتم تغيير أو حذف أي بيانات.',false)}
+ finally{btn.disabled=false;btn.textContent='إعادة الفحص';}
+});
+</script></body></html>
