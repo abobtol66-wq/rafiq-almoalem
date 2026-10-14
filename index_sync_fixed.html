@@ -109,7 +109,7 @@ async function importGrade5Roster(){
  const btn=$('importGrade5Roster'),status=$('importGrade5Status');
  btn.disabled=true;btn.textContent='جارٍ تحميل قائمة الطلاب…';
  try{
-  const response=await fetch('./grade5_roster.json?v=1',{cache:'no-store'});
+  const response=await fetch('./grade5_roster.json?v=2',{cache:'no-store'});
   if(!response.ok)throw new Error('تعذر تحميل ملف أسماء الطلاب.');
   const roster=await response.json();
   if(!confirm('سيتم إضافة أسماء الطلاب من كشف الصف الخامس إلى الشعب الخمس. لن تُحذف البيانات الموجودة، وسيتم تجاوز الاسم المكرر داخل الشعبة نفسها. هل تريد المتابعة؟'))return;
